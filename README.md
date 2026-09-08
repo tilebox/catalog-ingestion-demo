@@ -1,211 +1,131 @@
 # Catalog ingestion demo
 
-Build a searchable geospatial catalog from metadata files in Google Cloud Storage.
+Build a searchable geospatial catalog from metadata files in cloud storage.
 Backfill existing products, then use storage events to catalog new products as
-they arrive. The imagery stays in the bucket.
+they arrive.
 
-The backfill and storage automation use the same ingestion task:
-
-```text
-BackfillCatalog ──────▶ IngestProducts (batches of up to 500)
-CatalogStorageEvent ─▶ IngestProducts (one product)
-```
-
-The video uses 5,000 synthetic radar products with real Sentinel-1 acquisition
-footprints. This repository contains the ingestion code; it does not include the
-demo data, product generator, or one-off metadata repair tools.
+Use this project as a starting point for your own catalog. Point your coding agent
+at this repository and your data or metadata, then ask it to adapt the dataset
+schema, metadata parsing, and ingestion tasks to your products and requirements.
+The demo data is not public.
 
 ## Requirements
 
-- Python 3.12 or later, [uv](https://docs.astral.sh/uv/), and the
-  [Tilebox CLI](https://docs.tilebox.com/).
-- A Tilebox API key with access to datasets and workflows.
-- Your demo cluster configured as the organization's default cluster. The commands
-  below use that cluster without an explicit cluster argument.
-- A GCS bucket registered as a storage location in Tilebox. Its storage events must
-  be connected to Tilebox for the automation to run.
-- A runner with permission to list and read the bucket's objects.
+You need Python 3.12+, [uv](https://docs.astral.sh/uv/), the
+[Tilebox CLI](https://docs.tilebox.com/), and a Tilebox API key with access to
+datasets and workflows. Your runner needs permission to list and read your GCS
+bucket. Register the bucket as a Tilebox storage location and
+connect its storage events to Tilebox.
 
-## Configure the project
+Storage automations are in closed beta. To request access, email
+[tilebox-devs@tilebox.com](mailto:tilebox-devs@tilebox.com).
+
+## Setup
+
+Replace `<...>` placeholders with your values. Use the same catalog code name
+throughout.
 
 ```sh
 git clone https://github.com/tilebox/catalog-ingestion-demo.git
 cd catalog-ingestion-demo
-uv sync --locked
-export TILEBOX_API_KEY='your-api-key'
-tilebox whoami
-tilebox automation storage-locations --json
+uv sync
+export TILEBOX_API_KEY='<your-api-key>'
+tilebox automation storage-locations
 ```
 
-Edit `catalog_ingestion/config.py`:
+Edit [catalog_ingestion/config.py](catalog_ingestion/config.py):
 
-- Set `BUCKET_LOCATION` to the registered GCS location, in `project:bucket` form.
-- Set `DATASET_NAMESPACE` to your Tilebox dataset namespace.
-- Set `DEFAULT_PREFIX` to the directory containing your products. The default is
-  `catalog-ingestion/products`.
+- `BUCKET_LOCATION`: Your registered GCS location, in `project:bucket` form.
+- `ORGANIZATION_SLUG`: Your organization's slug.
+- `DEFAULT_PREFIX`: The bucket directory containing your products.
 
-Create a workflow for this checkout:
+The example reads an `item.json` file per product. See
+[`metadata_record`](catalog_ingestion/tasks.py) for the expected metadata fields
+and [schema.json](schema.json) for the catalog schema. Asset URLs must be absolute.
+You can also adapt the ingestion task to open product files and extract metadata
+directly.
+
+Create a workflow:
 
 ```sh
-tilebox workflow create "Catalog ingestion demo" --json
+tilebox workflow create "Catalog ingestion demo"
 ```
 
-Copy the returned `slug` into `tilebox.workflow.toml`. This repository already
-contains the workflow files, so there is no need to run `tilebox workflow init`.
-
-Publish and deploy:
+Copy the returned `slug` into `tilebox.workflow.toml`, then publish and deploy:
 
 ```sh
-tilebox workflow publish-release --json
-tilebox workflow deploy-release --latest --json
+tilebox workflow publish-release
+tilebox workflow deploy-release --latest
 ```
 
-Configuration is included in the release. Publish and deploy again after changing
-the bucket, namespace, or prefix.
+Publish and deploy again after changing the code or configuration.
 
-## Product metadata
+## Backfill the catalog
 
-Each product has its own directory:
-
-```text
-catalog-ingestion/products/<product-id>/
-├── vv.tif
-├── vh.tif
-├── preview.png
-└── item.json
-```
-
-The ingestion task reads `item.json`. It expects a GeoJSON Feature with these
-fields. Asset URLs must be absolute; replace the illustrative values below with
-your product's metadata.
-
-```json
-{
-  "type": "Feature",
-  "stac_version": "1.1.0",
-  "id": "example-product-001",
-  "geometry": {
-    "type": "Polygon",
-    "coordinates": [[[14, 47], [15, 47], [15, 48], [14, 48], [14, 47]]]
-  },
-  "properties": {
-    "datetime": "2026-08-01T10:00:00Z",
-    "orbit_direction": "descending",
-    "polarizations": ["VV", "VH"],
-    "processing_version": "1.0.0"
-  },
-  "assets": {
-    "vv": {
-      "href": "gs://your-bucket/catalog-ingestion/products/example-product-001/vv.tif",
-      "type": "image/tiff; application=geotiff; profile=cloud-optimized",
-      "roles": ["data"]
-    },
-    "vh": {
-      "href": "gs://your-bucket/catalog-ingestion/products/example-product-001/vh.tif",
-      "type": "image/tiff; application=geotiff; profile=cloud-optimized",
-      "roles": ["data"]
-    }
-  },
-  "links": []
-}
-```
-
-Asset keys are not fixed. A product can also include preview and metadata assets.
-The workflow stores their locations and metadata without downloading the imagery.
-
-## Create and backfill the catalog
-
-These commands work in Bash and Zsh. Use a new catalog code name for each rehearsal.
+Edit [documentation.md](documentation.md) to describe your dataset. The
+`--description-file` flag attaches this Markdown documentation to the catalog.
+Create the catalog and ingest the existing products:
 
 ```sh
-export CATALOG_CODE_NAME=radar_products_demo
-
 tilebox dataset create \
-  --name "Radar products" \
-  --code-name "$CATALOG_CODE_NAME" \
-  --summary "Radar product metadata and asset locations" \
+  --name '<catalog-name>' \
+  --code-name '<catalog-code-name>' \
+  --summary 'Product metadata and asset locations' \
   --schema-file schema.json \
-  --json
+  --description-file documentation.md
 
 tilebox job submit \
   --name backfill-catalog \
-  --task tilebox.com/catalog-ingestion/BackfillCatalog \
-  --version v2.1 \
-  --input "{\"catalog_code_name\":\"$CATALOG_CODE_NAME\"}" \
-  --wait --json
+  --task '<organization-slug>/catalog-ingestion/BackfillCatalog' \
+  --version v0.1 \
+  --input '{"catalog_code_name":"<catalog-code-name>"}' \
+  --wait
 ```
 
-The backfill lists `**/item.json` under the configured prefix and submits one task
-per batch of 500 products. Within each batch, it downloads up to 16 metadata files
-concurrently. For 5,000 products, the job has one root task and ten ingestion tasks.
-
-Keep the prefix unchanged during backfill: pause product uploads and metadata
-edits until the job completes. The batches use positions in the bucket listing,
-not a snapshot of its contents.
+The backfill reads `**/item.json` under the configured prefix in batches of up to
+500 products. Pause uploads and metadata changes under that prefix until it finishes.
 
 ## Query the catalog
 
-Set the namespace to the same value as `DATASET_NAMESPACE` in the configuration.
-Choose a date range that contains your products.
+Use the dataset slug returned when creating the catalog and a date range that
+contains your products:
 
 ```sh
-export DATASET_NAMESPACE=your-namespace
-
-tilebox dataset query "$DATASET_NAMESPACE.$CATALOG_CODE_NAME" \
+tilebox dataset query '<dataset-slug>' \
   --collections RTC \
-  --after 2026-08-01 --before 2026-08-28 \
-  --limit 100 --json
-
-tilebox dataset query "$DATASET_NAMESPACE.$CATALOG_CODE_NAME" \
-  --collections RTC \
-  --after 2026-08-01 --before 2026-08-28 \
-  --spatial-extent 'POLYGON((9.5 46.3,17.2 46.3,17.2 49.1,9.5 49.1,9.5 46.3))' \
+  --after '<YYYY-MM-DD>' --before '<YYYY-MM-DD>' \
   --filter "orbit_direction = 'ascending'" \
-  --limit 100 --json
+  --limit 100
 ```
 
-You can also open the catalog in the [Tilebox Console](https://console.tilebox.com/)
-to query it on a map and inspect individual products.
+Open the catalog in the [Tilebox Console](https://console.tilebox.com/) to query it
+on a map and inspect products.
 
 ## Catalog new products automatically
 
-After the backfill completes, register the storage automation:
+After backfill, register the storage automation:
 
 ```sh
-uv run python scripts/register_automation.py "$CATALOG_CODE_NAME"
-tilebox automation list --json
+uv run python scripts/register_automation.py '<catalog-code-name>'
+tilebox automation list
 ```
 
-The automation watches `<DEFAULT_PREFIX>/**/item.json` in the configured bucket.
-When a metadata file arrives, `CatalogStorageEvent` submits an `IngestProducts`
-task for that file. Re-running the registration script leaves an existing
-automation with the same name unchanged.
-
-Upload a new product's imagery first and its metadata last. For example, using
-the [Google Cloud CLI](https://cloud.google.com/sdk/docs/install):
+The automation watches `<DEFAULT_PREFIX>/**/item.json`. Upload each product's
+assets first and its metadata last. For example, with the
+[Google Cloud CLI](https://cloud.google.com/sdk/docs/install):
 
 ```sh
-export PRODUCT_DIR=./new-product
-export PRODUCT_DEST=gs://your-bucket/catalog-ingestion/products/new-product
-
-gcloud storage cp "$PRODUCT_DIR/vv.tif" "$PRODUCT_DIR/vh.tif" \
-  "$PRODUCT_DIR/preview.png" "$PRODUCT_DEST/"
-gcloud storage cp "$PRODUCT_DIR/item.json" "$PRODUCT_DEST/item.json"
+gcloud storage cp '<local-product-dir>/*.tif' 'gs://<bucket>/<prefix>/<product-id>/'
+gcloud storage cp '<local-product-dir>/item.json' 'gs://<bucket>/<prefix>/<product-id>/item.json'
 ```
 
-The metadata must reference the uploaded files. Check the triggered job and
-refresh the catalog to see the new product:
+Check the triggered job, then refresh the catalog:
 
 ```sh
-tilebox job list --last 1h --json
-tilebox job get JOB_ID --json
-tilebox job logs JOB_ID --sort desc --limit 50 --json
+tilebox job list --last 1h
+tilebox job logs '<job-id>' --sort desc --limit 50
 ```
 
-## Scope
-
-This example handles initial backfill and newly uploaded products. It does not
-synchronize edits or deletions. `allow_existing=True` allows existing records;
-do not use it to update their metadata. Use a fresh catalog when replacing demo metadata.
-Disable the storage automation before bulk metadata rewrites to avoid triggering
-an ingestion job for every changed file.
+This example ingests existing and new products; it does not synchronize edits or
+deletions. Use a fresh catalog when replacing metadata, and disable the automation
+before bulk metadata rewrites.

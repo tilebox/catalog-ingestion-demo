@@ -13,10 +13,11 @@ from catalog_ingestion.config import (
     BUCKET_LOCATION,
     COLLECTION_NAME,
     DEFAULT_PREFIX,
+    ORGANIZATION_SLUG,
     catalog_slug,
 )
 
-TASK_NAMESPACE = "tilebox.com/catalog-ingestion"
+TASK_NAMESPACE = f"{ORGANIZATION_SLUG}/catalog-ingestion"
 BACKFILL_BATCH_SIZE = 500
 DOWNLOAD_WORKERS = 16
 
@@ -27,7 +28,7 @@ class BackfillCatalog(Task):
 
     @staticmethod
     def identifier() -> tuple[str, str]:
-        return f"{TASK_NAMESPACE}/BackfillCatalog", "v2.1"
+        return f"{TASK_NAMESPACE}/BackfillCatalog", "v0.1"
 
     def execute(self, context: ExecutionContext) -> None:
         context.current_task.display = "BackfillCatalog"
@@ -77,7 +78,7 @@ class CatalogStorageEvent(StorageEventTask):
 
     @staticmethod
     def identifier() -> tuple[str, str]:
-        return f"{TASK_NAMESPACE}/CatalogStorageEvent", "v2.1"
+        return f"{TASK_NAMESPACE}/CatalogStorageEvent", "v0.1"
 
     def execute(self, context: ExecutionContext) -> None:
         metadata_path = self.trigger.location.lstrip("/")
@@ -102,7 +103,7 @@ class IngestProducts(Task):
 
     @staticmethod
     def identifier() -> tuple[str, str]:
-        return f"{TASK_NAMESPACE}/IngestProducts", "v1.0"
+        return f"{TASK_NAMESPACE}/IngestProducts", "v0.1"
 
     def execute(self, context: ExecutionContext) -> None:
         if not 1 <= self.batch_size <= BACKFILL_BATCH_SIZE:
