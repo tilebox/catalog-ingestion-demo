@@ -4,6 +4,8 @@ Build a searchable geospatial catalog from metadata files in cloud storage.
 Backfill existing products, then use storage events to catalog new products as
 they arrive.
 
+[Watch the demo on YouTube](https://youtu.be/HTT4Cl6ks98).
+
 Use this project as a starting point for your own catalog. Point your coding agent
 at this repository and your data or metadata, then ask it to adapt the dataset
 schema, metadata parsing, and ingestion tasks to your products and requirements.
