@@ -1,0 +1,38 @@
+{
+  "kind": "spatiotemporal",
+  "fields": [
+    {
+      "name": "product_id",
+      "type": "string",
+      "queryable": true,
+      "roles": ["primary_title"],
+      "description": "Stable product identifier.",
+      "example_value": "example-product-001"
+    },
+    {
+      "name": "orbit_direction",
+      "type": "string",
+      "queryable": true,
+      "description": "Acquisition orbit direction: ascending or descending.",
+      "example_value": "ascending"
+    },
+    {
+      "name": "polarizations",
+      "type": "string",
+      "repeated": true,
+      "description": "Polarizations available as product assets.",
+      "example_value": "[\"VV\", \"VH\"]"
+    },
+    {
+      "name": "processing_version",
+      "type": "string",
+      "description": "Processing version of the product.",
+      "example_value": "1.0.0"
+    },
+    {
+      "name": "assets",
+      "type": "datasets.stac.v1.Assets",
+      "description": "COGs, preview, and source metadata associated with the product."
+    }
+  ]
+}

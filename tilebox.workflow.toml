@@ -1,0 +1,13 @@
+[workflow]
+slug = "replace-with-your-workflow-slug"
+root = "."
+runner = "runner:runner"
+
+[build]
+include = [
+  "pyproject.toml",
+  "uv.lock",
+  "README.md",
+  "runner.py",
+  "catalog_ingestion/*.py",
+]
